@@ -11,7 +11,7 @@ public class control_statements16 {
             int digit=n%10;
             r=r*10+digit;
             n=n/10;
-        }
+        }sc.close();
         System.out.println("o/p: " +r);
     }
 }

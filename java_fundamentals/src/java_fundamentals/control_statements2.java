@@ -11,7 +11,7 @@ public class control_statements2 {
 		}
 		else {
 			System.out.println("odd");
-		}
+		}sc.close();
 
 	}
 

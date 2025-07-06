@@ -6,5 +6,6 @@ public class Question1 {
 		String a = sc.nextLine();
 		String b = sc.nextLine();
 		System.out.println(a + " technologies " + b);
+		sc.close();
 	}
 }

@@ -7,7 +7,7 @@ public class Question3 {
 		int a=sc.nextInt();
 		int b=sc.nextInt();
 		System.out.println("The sum of " + a + " and " + b + " is " + (a+b));
-		
+		sc.close();
 	}
 
 }

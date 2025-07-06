@@ -12,7 +12,7 @@ public class control_statements17 {
 			int rem = n%10;
 		    sum=sum*10+rem;
 			n=n/10;
-		}
+		}sc.close();
 		if(sum==temp) {
 			System.out.println(temp +" is a palindrome");
 		}else {

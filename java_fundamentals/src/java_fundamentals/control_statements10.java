@@ -1,5 +1,5 @@
 package java_fundamentals;
-import java.util.*;
+
 public class control_statements10 {
 
 	public static void main(String[] args) {

@@ -13,6 +13,6 @@ public class control_statements1 {
 		}
 		else {
 			System.out.println("Zero");
-		}
+		}sc.close();
 	}
 }

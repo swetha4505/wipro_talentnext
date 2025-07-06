@@ -12,7 +12,7 @@ public class control_statements4 {
 		}
 		else {
 			System.out.println(b+","+a);
-		}
+		}sc.close();
 
 	}
 

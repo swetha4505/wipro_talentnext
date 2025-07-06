@@ -12,6 +12,6 @@ public class control_statements7 {
 		}
 		else if(Character.isUpperCase(c)){
 			System.out.println("o/p:" + c +"->" + Character.toLowerCase(c));
-		}
+		}sc.close();
 	}
 }

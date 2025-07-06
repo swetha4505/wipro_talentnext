@@ -11,6 +11,6 @@ public class control_statements1b {
 		}
 		else {
 			System.out.println("False");
-		}
+		}sc.close();
 	}
 }

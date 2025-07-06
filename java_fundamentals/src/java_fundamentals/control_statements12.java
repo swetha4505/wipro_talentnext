@@ -10,7 +10,7 @@ public class control_statements12 {
 			System.out.println("prime");
 		}else {
 			System.out.println("not prime");
-		}
+		}sc.close();
 	}
 	static boolean prime(int n) {
 		if(n <2) return false;

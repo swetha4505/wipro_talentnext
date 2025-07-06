@@ -13,6 +13,6 @@ public class control_statements5 {
 		}
 		else {
 		System.out.println("Special Character");
-		}
+		}sc.close();
 	}
 }

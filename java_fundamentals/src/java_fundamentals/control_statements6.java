@@ -16,7 +16,7 @@ public class control_statements6 {
 		}
 		else if(g.equalsIgnoreCase("male") && (a>=59 && a<=100)) {
 		System.out.println("The percentage of the interest is 10.5%");
-		}
+		}sc.close();
 	}
 
 }
