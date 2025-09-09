@@ -1,0 +1,606 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+const MemoryCardGame = () => {
+  const emojis = ['🎮', '🎯', '🎨', '🎪', '🎭', '🎸', '🎲', '🏆', '⚽', '🏀'];
+  const [cards, setCards] = useState([]);
+  const [flippedCards, setFlippedCards] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState(1);
+  const [numPlayers, setNumPlayers] = useState(2);
+  const [scores, setScores] = useState({ player1: 0, player2: 0, player3: 0, player4: 0 });
+  const [gameWon, setGameWon] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [playerNames, setPlayerNames] = useState({ player1: 'Player 1', player2: 'Player 2', player3: 'Player 3', player4: 'Player 4' });
+  const [gameStarted, setGameStarted] = useState(false);
+  const [setupStep, setSetupStep] = useState('welcome');
+  const [highScores, setHighScores] = useState([]);
+  const [showHighScores, setShowHighScores] = useState(false);
+  const [showWinningPage, setShowWinningPage] = useState(false);
+  const [nameValidation, setNameValidation] = useState('');
+
+  // Initialize game
+  const initializeGame = useCallback(() => {
+    const gameCards = [...emojis, ...emojis].map((emoji, index) => ({
+      id: index,
+      emoji,
+      isFlipped: false,
+      isMatched: false,
+      matchedBy: null
+    }));
+    
+    // Shuffle cards
+    const shuffled = gameCards.sort(() => Math.random() - 0.5);
+    setCards(shuffled);
+    setFlippedCards([]);
+    setCurrentPlayer(1);
+    const initialScores = { player1: 0, player2: 0, player3: 0, player4: 0 };
+    setScores(initialScores);
+    setGameWon(false);
+    setWinner(null);
+    setIsChecking(false);
+  }, []);
+
+  useEffect(() => {
+    initializeGame();
+  }, []);
+
+  const handleCardClick = (cardId) => {
+    if (isChecking || flippedCards.length >= 2 || !gameStarted) return;
+    
+    const card = cards.find(c => c.id === cardId);
+    if (card.isFlipped || card.isMatched) return;
+
+    const newFlippedCards = [...flippedCards, cardId];
+    setFlippedCards(newFlippedCards);
+
+    setCards(prevCards => 
+      prevCards.map(c => 
+        c.id === cardId ? { ...c, isFlipped: true } : c
+      )
+    );
+
+    if (newFlippedCards.length === 2) {
+      setIsChecking(true);
+      
+      setTimeout(() => {
+        checkForMatch(newFlippedCards);
+      }, 1000);
+    }
+  };
+
+  const checkForMatch = (flippedCardIds) => {
+    setCards(prevCards => {
+      const [firstCard, secondCard] = flippedCardIds.map(id => 
+        prevCards.find(c => c.id === id)
+      );
+
+      if (firstCard.emoji === secondCard.emoji) {
+        // Match found - current player gets a point and continues
+        const updatedCards = prevCards.map(c => 
+          flippedCardIds.includes(c.id) 
+            ? { ...c, isMatched: true, matchedBy: currentPlayer }
+            : c
+        );
+        
+        setScores(prevScores => {
+          const newScores = {
+            ...prevScores,
+            [`player${currentPlayer}`]: prevScores[`player${currentPlayer}`] + 1
+          };
+          
+          // Check if game is won
+          const totalPairs = Object.values(newScores).reduce((sum, score) => sum + score, 0);
+          if (totalPairs === emojis.length) {
+            setGameWon(true);
+            determineWinner(newScores);
+            setTimeout(() => {
+              setShowWinningPage(true);
+            }, 2000);
+          }
+          
+          return newScores;
+        });
+        
+        return updatedCards;
+      } else {
+        // No match - flip cards back and switch turn
+        setCurrentPlayer(prevPlayer => prevPlayer === numPlayers ? 1 : prevPlayer + 1);
+        
+        return prevCards.map(c => 
+          flippedCardIds.includes(c.id) 
+            ? { ...c, isFlipped: false }
+            : c
+        );
+      }
+    });
+
+    setFlippedCards([]);
+    setIsChecking(false);
+  };
+
+  const determineWinner = (finalScores) => {
+    const playerScores = [];
+    for (let i = 1; i <= numPlayers; i++) {
+      playerScores.push({
+        player: i,
+        score: finalScores[`player${i}`],
+        name: playerNames[`player${i}`]
+      });
+    }
+    
+    playerScores.sort((a, b) => b.score - a.score);
+    
+    if (playerScores[0].score === playerScores[1].score) {
+      // Check for tie
+      const tiedPlayers = playerScores.filter(p => p.score === playerScores[0].score);
+      if (tiedPlayers.length === numPlayers) {
+        setWinner('all-tie');
+      } else {
+        setWinner(tiedPlayers.map(p => p.player));
+      }
+    } else {
+      setWinner(playerScores[0].player);
+    }
+
+    // Save high score
+    saveHighScore(playerScores);
+  };
+
+  const saveHighScore = useCallback((playerScores) => {
+    const gameDate = new Date().toLocaleDateString();
+    const gameTime = new Date().toLocaleTimeString();
+    
+    const newHighScore = {
+      id: Date.now(),
+      date: gameDate,
+      time: gameTime,
+      players: numPlayers,
+      scores: playerScores,
+      winner: playerScores[0]
+    };
+
+    setHighScores(prev => {
+      const updated = [...prev, newHighScore];
+      // Keep only the last 10 high scores
+      return updated.slice(-10);
+    });
+  }, [numPlayers]);
+
+  const handleNameChange = (player, name) => {
+    setPlayerNames(prev => ({ ...prev, [player]: name.trim() }));
+    setNameValidation('');
+  };
+
+  const validateNames = () => {
+    for (let i = 1; i <= numPlayers; i++) {
+      const name = playerNames[`player${i}`];
+      if (!name || name.trim() === '' || name.trim() === `Player ${i}`) {
+        setNameValidation(`⚠️ Please enter a name for Player ${i}!`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const selectPlayerCount = (count) => {
+    setNumPlayers(count);
+    setSetupStep('playerNames');
+  };
+
+  const startGame = () => {
+    if (validateNames()) {
+      setGameStarted(true);
+      initializeGame();
+    }
+  };
+
+  const getPlayerColor = (player) => {
+    const colors = {
+      1: 'from-blue-500 to-blue-600',
+      2: 'from-red-500 to-red-600',
+      3: 'from-green-500 to-green-600',
+      4: 'from-purple-500 to-purple-600'
+    };
+    return colors[player];
+  };
+
+  const getCardBorderColor = (card) => {
+    if (card.isMatched) {
+      const colors = {
+        1: 'ring-4 ring-blue-400',
+        2: 'ring-4 ring-red-400',
+        3: 'ring-4 ring-green-400',
+        4: 'ring-4 ring-purple-400'
+      };
+      return colors[card.matchedBy];
+    }
+    return '';
+  };
+
+  const resetSetup = () => {
+    setGameStarted(false);
+    setShowWinningPage(false);
+    setSetupStep('welcome');
+    setPlayerNames({ player1: 'Player 1', player2: 'Player 2', player3: 'Player 3', player4: 'Player 4' });
+    setNameValidation('');
+  };
+
+  // Optimized high scores toggle functions
+  const openHighScores = useCallback(() => {
+    setShowHighScores(true);
+  }, []);
+
+  const closeHighScores = useCallback(() => {
+    setShowHighScores(false);
+  }, []);
+
+  const renderWinnerMessage = () => {
+    if (winner === 'all-tie') {
+      return "🤝 It's a complete tie! Amazing game everyone! 🤝";
+    } else if (Array.isArray(winner)) {
+      const winnerNames = winner.map(p => playerNames[`player${p}`]).join(' & ');
+      return `🤝 Tie between ${winnerNames}! Great game! 🤝`;
+    } else {
+      return `🎉 ${playerNames[`player${winner}`]} wins! 🎉`;
+    }
+  };
+
+  // Memoize the reversed high scores to prevent unnecessary computations
+  const reversedHighScores = useMemo(() => {
+    return [...highScores].reverse();
+  }, [highScores]);
+
+  // Welcome Screen
+  if (setupStep === 'welcome') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8 flex items-center justify-center overflow-hidden relative">
+        {/* Main Welcome Content */}
+        <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-12 text-center max-w-2xl w-full relative z-10 shadow-2xl">
+          {/* Animated Title with Brain Theme */}
+          <div className="mb-8">
+            <div className="text-8xl mb-4 animate-bounce">🧠</div>
+            <h1 className="text-6xl font-bold text-white mb-4 animate-pulse bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+              Memory
+            </h1>
+            <h2 className="text-4xl font-bold text-white mb-6 animate-pulse bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent" style={{ animationDelay: '0.5s' }}>
+              Card Game
+            </h2>
+          </div>
+
+          {/* Call to Action Button */}
+          <div className="mb-8">
+            <button
+              onClick={() => setSetupStep('playerCount')}
+              className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 
+                       text-white font-bold py-6 px-8 rounded-xl text-2xl
+                       transition-all duration-300 hover:scale-105 transform
+                       shadow-lg hover:shadow-xl animate-pulse"
+              style={{ animationDelay: '1s' }}
+            >
+              🚀 START GAME!
+            </button>
+          </div>
+        </div>
+
+        {/* Static Corner Decorations with Brain Theme */}
+        <div className="absolute top-10 left-10 text-6xl opacity-30">
+          🧠
+        </div>
+        <div className="absolute top-10 right-10 text-6xl opacity-30">
+          🏆
+        </div>
+        <div className="absolute bottom-10 left-10 text-6xl opacity-30">
+          🎯
+        </div>
+        <div className="absolute bottom-10 right-10 text-6xl opacity-30">
+          ⭐
+        </div>
+      </div>
+    );
+  }
+  if (showWinningPage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8 flex items-center justify-center">
+        <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 text-center max-w-lg w-full">
+          <div className="mb-8">
+            <div className="text-8xl animate-bounce mb-4">🏆</div>
+            <h1 className="text-4xl font-bold text-white mb-6 animate-pulse">
+              {renderWinnerMessage()}
+            </h1>
+            
+            {/* Fireworks animation */}
+            <div className="relative">
+              <div className="absolute inset-0 flex justify-center items-center">
+                <div className="text-4xl animate-ping">🎉</div>
+              </div>
+              <div className="absolute top-0 left-0 text-2xl animate-bounce" style={{animationDelay: '0.5s'}}>✨</div>
+              <div className="absolute top-0 right-0 text-2xl animate-bounce" style={{animationDelay: '1s'}}>⭐</div>
+              <div className="absolute bottom-0 left-0 text-2xl animate-bounce" style={{animationDelay: '1.5s'}}>🌟</div>
+              <div className="absolute bottom-0 right-0 text-2xl animate-bounce" style={{animationDelay: '2s'}}>💫</div>
+            </div>
+          </div>
+
+          {/* Final Scores */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 mb-8">
+            <h2 className="text-2xl font-bold text-white mb-4">Final Scores</h2>
+            <div className="space-y-2">
+              {Array.from({ length: numPlayers }, (_, i) => (
+                <div key={i} className={`
+                  flex justify-between items-center p-3 rounded-lg
+                  ${winner === i + 1 ? 'bg-yellow-500/30 border-2 border-yellow-400' : 'bg-white/10'}
+                `}>
+                  <span className="text-white font-bold text-lg">
+                    {winner === i + 1 && '👑 '}{playerNames[`player${i + 1}`]}
+                  </span>
+                  <span className="text-white text-xl font-bold">
+                    {scores[`player${i + 1}`]} pairs
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={resetSetup}
+              className="flex-1 bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                       text-white font-bold py-4 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              🎮 New Game
+            </button>
+            <button
+              onClick={openHighScores}
+              className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 
+                       text-white font-bold py-4 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              🏆 High Scores
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // High Scores Screen - Optimized rendering
+  if (showHighScores) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8 flex items-center justify-center">
+        <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 text-center max-w-2xl w-full">
+          <h1 className="text-4xl font-bold text-white mb-8">🏆 High Scores</h1>
+          
+          {highScores.length === 0 ? (
+            <div className="text-white text-xl mb-8">No games played yet!</div>
+          ) : (
+            <div className="space-y-4 mb-8 max-h-96 overflow-y-auto">
+              {reversedHighScores.map((score, index) => (
+                <div key={score.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-white">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-lg">Game #{highScores.length - index}</span>
+                    <span className="text-sm">{score.date} - {score.time}</span>
+                  </div>
+                  <div className="text-lg mb-2">
+                    🏆 Winner: <span className="font-bold text-yellow-300">{score.winner.name}</span> 
+                    <span className="text-sm"> ({score.winner.score} pairs)</span>
+                  </div>
+                  <div className="text-sm">
+                    👥 {score.players} Players: {score.scores.map(p => `${p.name} (${p.score})`).join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <button
+            onClick={closeHighScores}
+            className="bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                     text-white font-bold py-3 px-8 rounded-lg 
+                     transition-all duration-300 hover:scale-105
+                     border-2 border-white/30"
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Player Count Selection Screen
+  if (!gameStarted && setupStep === 'playerCount') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8 flex items-center justify-center">
+        <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 text-center max-w-md w-full">
+          <h1 className="text-4xl font-bold text-white mb-8">🧠 Memory Card Game</h1>
+          <h2 className="text-2xl font-bold text-white mb-6">How many players?</h2>
+          <div className="space-y-4">
+            <button
+              onClick={() => selectPlayerCount(2)}
+              className="w-full bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                       text-white font-bold py-4 px-8 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30 text-lg"
+            >
+              🎮 2 Players
+            </button>
+            <button
+              onClick={() => selectPlayerCount(3)}
+              className="w-full bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                       text-white font-bold py-4 px-8 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30 text-lg"
+            >
+              🎯 3 Players
+            </button>
+            <button
+              onClick={() => selectPlayerCount(4)}
+              className="w-full bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                       text-white font-bold py-4 px-8 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30 text-lg"
+            >
+              🎲 4 Players
+            </button>
+          </div>
+          
+          <div className="mt-8 flex gap-4">
+            <button
+              onClick={() => setSetupStep('welcome')}
+              className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 
+                       text-white font-bold py-3 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={openHighScores}
+              className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 
+                       text-white font-bold py-3 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              🏆 High Scores
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Player Names Setup Screen
+  if (!gameStarted && setupStep === 'playerNames') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8 flex items-center justify-center">
+        <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 text-center max-w-md w-full">
+          <h1 className="text-4xl font-bold text-white mb-8">🧠 Memory Card Game</h1>
+          <h2 className="text-xl font-bold text-white mb-6">Enter Player Names</h2>
+          <div className="space-y-4 mb-6">
+            {Array.from({ length: numPlayers }, (_, i) => (
+              <div key={i}>
+                <input
+                  type="text"
+                  placeholder={`Player ${i + 1}`}
+                  className={`w-full p-3 rounded-lg border-2 border-white/30 bg-white/20 text-white placeholder-white/70 focus:outline-none 
+                    ${i === 0 ? 'focus:border-blue-400' : i === 1 ? 'focus:border-red-400' : i === 2 ? 'focus:border-green-400' : 'focus:border-purple-400'}`}
+                  onChange={(e) => handleNameChange(`player${i + 1}`, e.target.value)}
+                  value={playerNames[`player${i + 1}`] === `Player ${i + 1}` ? '' : playerNames[`player${i + 1}`]}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Validation Message */}
+          {nameValidation && (
+            <div className="bg-red-500/20 border-2 border-red-400 text-red-100 p-3 rounded-lg mb-6 animate-pulse">
+              {nameValidation}
+            </div>
+          )}
+          <div className="flex gap-4">
+            <button
+              onClick={() => setSetupStep('playerCount')}
+              className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 
+                       text-white font-bold py-3 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={startGame}
+              className="flex-1 bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                       text-white font-bold py-3 px-6 rounded-lg 
+                       transition-all duration-300 hover:scale-105
+                       border-2 border-white/30"
+            >
+              Start Game! 🚀
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Game Screen
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-4">🧠 Memory Card Game</h1>
+          
+          {/* Player Stats */}
+          <div className={`flex justify-center gap-4 mb-4 ${numPlayers >= 3 ? 'flex-wrap' : ''}`}>
+            {Array.from({ length: numPlayers }, (_, i) => (
+              <div key={i} className={`
+                bg-gradient-to-r ${getPlayerColor(i + 1)} text-white p-4 rounded-lg shadow-lg
+                ${currentPlayer === i + 1 ? 'ring-4 ring-white/50 scale-105' : ''}
+                transition-all duration-300 ${numPlayers >= 3 ? 'min-w-[180px]' : ''}
+              `}>
+                <div className="font-bold text-lg">{playerNames[`player${i + 1}`]}</div>
+                <div className="text-2xl font-bold">{scores[`player${i + 1}`]} pairs</div>
+                {currentPlayer === i + 1 && !gameWon && (
+                  <div className="text-sm animate-pulse">Your turn! 👆</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {gameWon && (
+          <div className="text-center mb-8">
+            <div className="bg-green-500 text-white text-xl font-bold py-4 px-8 rounded-lg shadow-lg animate-bounce">
+              {renderWinnerMessage()}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-5 gap-4 mb-8">
+          {cards.map((card) => (
+            <div
+              key={card.id}
+              className={`
+                aspect-square bg-white/20 backdrop-blur-sm rounded-lg 
+                border-2 border-white/30 cursor-pointer
+                flex items-center justify-center text-4xl
+                ${card.isFlipped || card.isMatched 
+                  ? 'bg-white shadow-lg' 
+                  : 'hover:bg-white/30'
+                }
+                ${getCardBorderColor(card)}
+              `}
+              onClick={() => handleCardClick(card.id)}
+            >
+              {card.isFlipped || card.isMatched ? (
+                <span>{card.emoji}</span>
+              ) : (
+                <span className="text-white/50">❓</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center">
+          <button
+            onClick={resetSetup}
+            className="bg-white/20 backdrop-blur-sm hover:bg-white/30 
+                     text-white font-bold py-3 px-8 rounded-lg 
+                     transition-all duration-300 hover:scale-105
+                     border-2 border-white/30"
+          >
+            New Game
+          </button>
+        </div>
+
+        <div className="text-center mt-8 text-white/80">
+          <p>🎯 Find matching pairs to score points!</p>
+          <p>💡 Match = Continue playing, No match = Next player's turn</p>
+          <p>🏆 Player with most pairs wins!</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MemoryCardGame;
